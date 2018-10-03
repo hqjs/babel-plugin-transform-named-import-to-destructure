@@ -9,8 +9,17 @@ module.exports = function({ types: t }) {
         const dest = t.variableDeclaration(
           'const',
           [ t.variableDeclarator(
-            t.objectPattern(namedSpec.map(({ imported, local }) => t.objectProperty(imported, local, false, imported.name === local.name))),
-            name,
+            t.objectPattern(namedSpec
+              .map(({ imported, local }) =>
+                t.objectProperty(imported, local, false, imported.name === local.name))),
+            t.logicalExpression(
+              '||',
+              t.memberExpression(
+                name,
+                t.identifier('default')
+              ),
+              name
+            ),
           ) ],
         );
         nodePath.node.specifiers = [ t.ImportNamespaceSpecifier(name) ];
