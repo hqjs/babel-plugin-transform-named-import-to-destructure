@@ -1,4 +1,4 @@
-# http://hqjs.org
+# hqjs.org
 Transform named import to destructure
 
 # Installation
