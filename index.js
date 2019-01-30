@@ -7,21 +7,25 @@ module.exports = function({ types: t }) {
   const one = t.numericLiteral(1);
   return {
     visitor: {
-      ImportDeclaration(nodePath) {
-        const { specifiers } = nodePath.node;
-        const namedSpec = specifiers.filter(s => t.isImportSpecifier(s));
-        if (namedSpec.length === 0) return;
+      ImportDeclaration(nodePath, state) {
+        const { baseURI = '', map = '' } = state.opts;
+        const { filename = '' } = state.file.opts;
+        const { specifiers, source } = nodePath.node;
+        if (specifiers.length === 0) return;
         const name = nodePath.scope.generateUidIdentifierBasedOnNode('destructure');
         const exportDefault = t.memberExpression(
           name,
           t.identifier('default')
         );
+        const modName = nodePath.scope.generateUidIdentifierBasedOnNode('destructure');
         const dest = t.variableDeclaration(
-          'const',
-          [ t.variableDeclarator(
-            t.objectPattern(namedSpec
-              .map(({ imported, local }) =>
-                t.objectProperty(imported, local, false, imported.name === local.name))),
+          'let',
+          specifiers.map(({ local }) => t.variableDeclarator(local)).concat(t.variableDeclarator(modName))
+        );
+        const importAssignment = t.blockStatement([
+          t.expressionStatement(t.assignmentExpression(
+            '=',
+            modName,
             t.conditionalExpression(
               t.logicalExpression(
                 '&&',
@@ -40,10 +44,63 @@ module.exports = function({ types: t }) {
               ),
               exportDefault,
               name
-            ),
-          ) ],
+            )
+          )),
+          ...specifiers.map(spec => t.expressionStatement(t.assignmentExpression(
+            '=',
+            spec.local,
+            spec.imported ?
+            	t.memberExpression(modName, spec.imported) :
+            	t.isImportNamespaceSpecifier(spec) ?
+            		name :
+            		modName
+          ))),
+        ]);
+        const decl = t.tryStatement(
+          importAssignment,
+          t.catchClause(
+            null,
+            t.blockStatement([
+              t.expressionStatement(t.callExpression(
+                  t.memberExpression(
+                    t.callExpression(
+                      t.memberExpression(
+                        t.callExpression(
+                          t.memberExpression(
+                            t.identifier('Promise'),
+                            t.identifier('resolve')
+                          ),
+                          []
+                        ),
+                        t.identifier('then')
+                      ),
+                      [
+                        t.arrowFunctionExpression(
+                          [],
+                          importAssignment
+                        ),
+                      ]
+                    ),
+                    t.identifier('catch')
+                  ),
+                  [
+                    t.arrowFunctionExpression(
+                      [],
+                      t.callExpression(
+                        t.memberExpression(
+                          t.identifier('console'),
+                          t.identifier('error')
+                        ),
+                        [t.stringLiteral(`Unable to resolve cyclic dependencies between module "${baseURI}${filename}${map}" and "${source.value}${map}" while requesting "${specifiers.map(s => s.imported ? s.imported.name : t.isImportNamespaceSpecifier(s) ? '*' : 'default').join('", ')}". Try to change imports order in a parent module`)]
+                      ),
+                    ),
+                  ]
+                )),
+            ])
+          )
         );
         nodePath.node.specifiers = [ t.ImportNamespaceSpecifier(name) ];
+        nodePath.insertAfter(decl);
         nodePath.insertAfter(dest);
       },
     },
