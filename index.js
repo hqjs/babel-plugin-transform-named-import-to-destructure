@@ -165,7 +165,7 @@ module.exports = function ({ types: t }) {
                           t.identifier('console'),
                           t.identifier('error')
                         ),
-                        [t.stringLiteral(`Unable to resolve cyclic dependencies between module "${baseURI}${filename}${map}" and "${source.value}${map}" while requesting "${importSpecifiers.map(s => s.imported ? s.imported.name : t.isImportNamespaceSpecifier(s) ? '*' : 'default').join('", ')}". Try to change imports order in a parent module`)]
+                        [t.stringLiteral(`Unable to resolve cyclic dependencies between module "${baseURI}${filename}${map}" and "${source.value.replace(baseURI, '')}${map}" while requesting "${importSpecifiers.map(s => s.imported ? s.imported.name : t.isImportNamespaceSpecifier(s) ? '*' : 'default').join('", ')}". Try to change imports order in a parent module`)]
                       ),
                     ),
                   ]
