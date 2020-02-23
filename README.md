@@ -1,5 +1,5 @@
 # hqjs.org
-Transform named import to destructure
+Transform named import to destructure, provides better error messages for circular dependencies.
 
 # Installation
 ```sh
@@ -7,7 +7,7 @@ npm install hqjs@babel-plugin-transform-named-import-to-destructure
 ```
 
 # Transformation
-Plugin makes destructure imports work with circular dependencies, it also work together with typescript and type metadata.
+Plugin makes destructure imports work with circular dependencies, it also work together with typescript and type metadata. Basically it tries to fail early with module assignment, catches the error and tries to assign again. With second failure it provides nicer error message.
 ```ts
 ...
 import { Injectable } from '@angular/core';
@@ -35,73 +35,33 @@ export class HeroService {
 
 will turn into
 ```ts
-import * as _ref from "@angular/core";
+let Injectable;
+import * as _ref from '@angular/core';
+Promise.resolve((Injectable = "Injectable" in _ref ? _ref.Injectable : _ref.default.Injectable)).then(() => (Injectable = "Injectable" in _ref ? _ref.Injectable : _ref.default.Injectable)).catch(() => console.error("Unable to resolve cyclic dependencies between module \"\" and \"@angular/core\" while requesting \"Injectable as Injectable\". Try to import \"\" before \"@angular/core\" in a parent module"))
+let of;
+import * as _ref2 from 'rxjs'; // Observable is only type import, while of is regular import
 
-let Injectable, _ref2;
+Promise.resolve((of = "of" in _ref2 ? _ref2.of : _ref2.default.of)).then(() => (of = "of" in _ref2 ? _ref2.of : _ref2.default.of)).catch(() => console.error("Unable to resolve cyclic dependencies between module \"\" and \"rxjs\" while requesting of as of\". Try to import \"\" before \"rxjs\" in a parent module"))
 
-try {
-  _ref2 = Object.keys(_ref).length === 1 && _ref.default ? _ref.default : _ref;
-  Injectable = _ref2.Injectable;
-} catch {
-  Promise.resolve().then(() => {
-    _ref2 = Object.keys(_ref).length === 1 && _ref.default ? _ref.default : _ref;
-    Injectable = _ref2.Injectable;
-  }).catch(() => console.error("Unable to resolve cyclic dependencies between module \"./hero.service.ts.map*\" and \"@angular/core.map*\" while requesting \"Injectable\". Try to change imports order in a parent module"));
-}
+let HEROES;
+import * as _ref4 from './mock-heroes';
+Promise.resolve((HEROES = "HEROES" in _ref4 ? _ref4.HEROES : _ref4.default.HEROES)).then(() => (HEROES = "HEROES" in _ref4 ? _ref4.HEROES : _ref4.default.HEROES)).catch(() => console.error("Unable to resolve cyclic dependencies between module \"\" and \"./mock-heroes\" while requesting \"HEROES as HEROES\". Try to import \"\" before \"./mock-heroes\" in a parent module"))
+let MessageService;
+import * as _ref5 from './message.service'; // This is type import, but it is required for metadata
 
-import * as _ref3 from "rxjs";
-
-let of, _ref4;
-
-try {
-  _ref4 = Object.keys(_ref3).length === 1 && _ref3.default ? _ref3.default : _ref3;
-  of = _ref4.of;
-} catch {
-  Promise.resolve().then(() => {
-    _ref4 = Object.keys(_ref3).length === 1 && _ref3.default ? _ref3.default : _ref3;
-    of = _ref4.of;
-  }).catch(() => console.error("Unable to resolve cyclic dependencies between module \"./hero.service.ts.map*\" and \"rxjs.map*\" while requesting \"of\". Try to change imports order in a parent module"));
-}
-
-import * as _ref5 from "./mock-heroes";
-
-let HEROES, _ref6;
-
-try {
-  _ref6 = Object.keys(_ref5).length === 1 && _ref5.default ? _ref5.default : _ref5;
-  HEROES = _ref6.HEROES;
-} catch {
-  Promise.resolve().then(() => {
-    _ref6 = Object.keys(_ref5).length === 1 && _ref5.default ? _ref5.default : _ref5;
-    HEROES = _ref6.HEROES;
-  }).catch(() => console.error("Unable to resolve cyclic dependencies between module \"./hero.service.ts.map*\" and \"./mock-heroes.map*\" while requesting \"HEROES\". Try to change imports order in a parent module"));
-}
-
-import * as _ref7 from "./message.service";
-
-let MessageService, _ref8;
-
-try {
-  _ref8 = Object.keys(_ref7).length === 1 && _ref7.default ? _ref7.default : _ref7;
-  MessageService = _ref8.MessageService;
-} catch {
-  Promise.resolve().then(() => {
-    _ref8 = Object.keys(_ref7).length === 1 && _ref7.default ? _ref7.default : _ref7;
-    MessageService = _ref8.MessageService;
-  }).catch(() => console.error("Unable to resolve cyclic dependencies between module \"./hero.service.ts.map*\" and \"./message.service.map*\" while requesting \"MessageService\". Try to change imports order in a parent module"));
-}
+Promise.resolve((MessageService = "MessageService" in _ref5 ? _ref5.MessageService : _ref5.default.MessageService)).then(() => (MessageService = "MessageService" in _ref5 ? _ref5.MessageService : _ref5.default.MessageService)).catch(() => console.error("Unable to resolve cyclic dependencies between module \"\" and \"./message.service\" while requesting \"MessageService as MessageService\". Try to import \"\" before \"./message.service\" in a parent module"))
 
 @Injectable({
-  providedIn: 'root',
+  providedIn: 'root'
 })
 export class HeroService {
-
-  constructor(private messageService: MessageService) { }
+  constructor(private messageService: MessageService) {}
 
   getHeroes(): Observable<Hero[]> {
     this.messageService.add('HeroService: fetched heroes');
     return of(HEROES);
   }
+
 }
 
 ```
