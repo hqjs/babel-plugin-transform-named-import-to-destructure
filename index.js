@@ -43,7 +43,7 @@ function isImportTypeOnly({ binding, jsxPragma }) {
 }
 
 function checkCircular(t, importAssignment, error) {
-  return t.callExpression(
+  return t.expressionStatement(t.callExpression(
     t.memberExpression(
       t.callExpression(
         t.memberExpression(
@@ -77,7 +77,7 @@ function checkCircular(t, importAssignment, error) {
         ),
       ),
     ]
-  );
+  ));
 }
 
 function destructure(t, spec, importLocalName) {
@@ -204,7 +204,7 @@ module.exports = function ({ types: t }) {
               )),
             ]);
             const error = t.stringLiteral(`Unable to resolve cyclic dependencies between module "${baseURI}${filename}${map}" and "${source.value.replace(baseURI, '')}${map}" while requesting "*" as "${defaultSpecifiers.map(s => s.local.name).join('", ')}". Try to import "${baseURI}${filename}" before "${source.value.replace(baseURI, '')}" in a parent module`);
-      		  const tryAssignment = checkCircular(t, importAssignment, error);
+            const tryAssignment = checkCircular(t, importAssignment, error);
 
             modifiedSpecifiers.push(t.importNamespaceSpecifier(importLocalName));
             nodePath.insertAfter(tryAssignment);
