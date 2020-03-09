@@ -1,6 +1,6 @@
 {
   "name": "@hqjs/babel-plugin-transform-named-import-to-destructure",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Transform named import to destructure, provides better error messages for circular dependencies",
   "main": "index.js",
   "scripts": {
