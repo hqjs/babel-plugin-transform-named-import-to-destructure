@@ -43,7 +43,9 @@ function isImportTypeOnly({ binding, jsxPragma }) {
 }
 
 function checkCircular(t, importAssignment, error) {
-  return t.expressionStatement(t.callExpression(
+  return t.tryStatement(
+	t.blockStatement([t.expressionStatement(importAssignment)]),
+    t.catchClause(null, t.blockStatement([t.expressionStatement(t.callExpression(
     t.memberExpression(
       t.callExpression(
         t.memberExpression(
@@ -52,7 +54,7 @@ function checkCircular(t, importAssignment, error) {
               t.identifier('Promise'),
               t.identifier('resolve')
             ),
-            [importAssignment]
+            []
           ),
           t.identifier('then')
         ),
@@ -77,7 +79,8 @@ function checkCircular(t, importAssignment, error) {
         ),
       ),
     ]
-  ));
+  ))]))
+  );
 }
 
 function destructure(t, spec, importLocalName) {
@@ -97,7 +100,23 @@ function destructure(t, spec, importLocalName) {
   );
 }
 
-// TODO: do not transform type only declarations
+function destructureDefault(t, importLocalName) {
+  const exportDefault = t.memberExpression(
+    importLocalName,
+    t.identifier('default')
+  );
+
+  return t.conditionalExpression(
+    t.binaryExpression(
+      'in',
+      t.StringLiteral('default'),
+      importLocalName
+    ),
+    t.memberExpression(importLocalName, t.identifier('default')),
+    importLocalName
+  );
+}
+
 module.exports = function ({ types: t }) {
   return {
     visitor: {
@@ -126,6 +145,10 @@ module.exports = function ({ types: t }) {
           const { baseURI = '', map = '' } = state.opts;
           const { filename = '' } = state.file.opts;
           const { specifiers, source } = nodePath.node;
+
+          const dstName = `${baseURI}${filename}`;
+          const srcName = `${baseURI}${source.value}`.replace(new RegExp(`(${baseURI})+`), baseURI);
+
           const importSpecifiers = specifiers.filter(({ local }) => {
             const binding = nodePath.scope.getBinding(local.name);
             return !binding ||
@@ -152,13 +175,13 @@ module.exports = function ({ types: t }) {
               ...defaultSpecifiers.map(spec => t.assignmentExpression(
                 '=',
                 spec.local,
-                importLocalName
+                destructureDefault(t, importLocalName)
               )),
             ]);
-            const error = t.stringLiteral(`Unable to resolve cyclic dependencies between module "${baseURI}${filename}${map}" and "${source.value.replace(baseURI, '')}${map}" while requesting "default" as "${defaultSpecifiers.map(s => s.local.name).join('", ')}". Try to import "${baseURI}${filename}" before "${source.value.replace(baseURI, '')}" in a parent module`);
+            const error = t.stringLiteral(`Unable to resolve cyclic dependencies between module "${dstName}${map}" and "${srcName}${map}" while requesting "default" as "${defaultSpecifiers.map(s => s.local.name).join('", ')}". Try to import "${dstName}" before "${srcName}" in a parent module`);
             const tryAssignment = checkCircular(t, importAssignment, error);
 
-            modifiedSpecifiers.push(t.importDefaultSpecifier(importLocalName));
+            modifiedSpecifiers.push(t.importNamespaceSpecifier(importLocalName));
             nodePath.insertAfter(tryAssignment);
             nodePath.insertBefore(moduleDeclarations);
           }
@@ -179,7 +202,7 @@ module.exports = function ({ types: t }) {
                 destructure(t, spec, importLocalName)
               )),
             ]);
-            const error = t.stringLiteral(`Unable to resolve cyclic dependencies between module "${baseURI}${filename}${map}" and "${source.value.replace(baseURI, '')}${map}" while requesting "${destrSpecifiers.map(s => s.local.name).join('", ')} as ${destrSpecifiers.map(s => s.imported.name).join('", ')}". Try to import "${baseURI}${filename}" before "${source.value.replace(baseURI, '')}" in a parent module`);
+            const error = t.stringLiteral(`Unable to resolve cyclic dependencies between module "${dstName}${map}" and "${srcName}${map}" while requesting "${destrSpecifiers.map(s => s.local.name).join('", ')} as ${destrSpecifiers.map(s => s.imported.name).join('", ')}". Try to import "${dstName}" before "${srcName}" in a parent module`);
             const tryAssignment = checkCircular(t, importAssignment, error);
 
             modifiedSpecifiers.push(t.importNamespaceSpecifier(importLocalName));
@@ -188,28 +211,7 @@ module.exports = function ({ types: t }) {
           }
 
           const namespaceSpecifiers = importSpecifiers.filter(spec => t.isImportNamespaceSpecifier(spec));
-          if (namespaceSpecifiers.length > 0) {
-            const importLocalName = nodePath.scope.generateUidIdentifierBasedOnNode('destructure');
-
-            const moduleDeclarations = t.variableDeclaration(
-              'let',
-              namespaceSpecifiers.map(({ local }) => t.variableDeclarator(local))
-            );
-
-            const importAssignment = t.sequenceExpression([
-              ...namespaceSpecifiers.map(spec => t.assignmentExpression(
-                '=',
-                spec.local,
-                importLocalName
-              )),
-            ]);
-            const error = t.stringLiteral(`Unable to resolve cyclic dependencies between module "${baseURI}${filename}${map}" and "${source.value.replace(baseURI, '')}${map}" while requesting "*" as "${defaultSpecifiers.map(s => s.local.name).join('", ')}". Try to import "${baseURI}${filename}" before "${source.value.replace(baseURI, '')}" in a parent module`);
-            const tryAssignment = checkCircular(t, importAssignment, error);
-
-            modifiedSpecifiers.push(t.importNamespaceSpecifier(importLocalName));
-            nodePath.insertAfter(tryAssignment);
-            nodePath.insertBefore(moduleDeclarations);
-          }
+          modifiedSpecifiers.push(...namespaceSpecifiers);
 
           nodePath.node.specifiers = modifiedSpecifiers;
         }
